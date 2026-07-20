@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* #ffffff */
+    --foreground: 220 15% 10%; /* #111827 */
+    
+    --card: 0 0% 100%; /* #ffffff */
+    --card-foreground: 220 15% 10%; /* #111827 */
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 10%;
+    
+    --primary: 142 70% 45%; /* #22C55E */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 120 15% 97.5%; /* #F8FAF8 */
+    --secondary-foreground: 220 15% 10%;
+    
+    --muted: 220 9% 65%; /* #9CA3AF */
+    --muted-foreground: 220 9% 46%; /* #6B7280 */
+    
+    --accent: 142 70% 95%; /* #DCFCE7 */
+    --accent-foreground: 142 76% 36%; /* #16A34A */
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    
+    --border: 220 13% 91%; /* #E5E7EB */
+    --input: 220 13% 91%; /* #E5E7EB */
+    --ring: 142 70% 45%; /* #22C55E */
+    
+    --radius: 1.75rem; /* 28px */
+    
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(229, 231, 235, 0.7);
+  }
+
+  /* Force dark class to share the premium white theme tokens as requested by White Theme */
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 220 15% 10%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 10%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 10%;
+    
+    --primary: 142 70% 45%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 120 15% 97.5%;
+    --secondary-foreground: 220 15% 10%;
+    
+    --muted: 220 9% 65%;
+    --muted-foreground: 220 9% 46%;
+    
+    --accent: 142 70% 95%;
+    --accent-foreground: 142 76% 36%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 142 70% 45%;
+    
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(229, 231, 235, 0.7);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Glassmorphism custom classes */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-glow {
+  box-shadow: 0 8px 32px 0 rgba(34, 197, 94, 0.04);
+}
+
+/* Text glow class */
+.text-glow {
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+}
+
+/* Premium micro animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-premium-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--secondary));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
