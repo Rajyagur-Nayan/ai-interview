@@ -23,25 +23,19 @@ import * as faceapi from "face-api.js";
 import { useInterview } from "@/hooks/useInterview";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useEvaluation } from "@/hooks/useEvaluation";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useReport } from "@/hooks/useReport";
 
 export default function InterviewSession() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const { user } = useAuthStore();
-  
+
   // Groq AI modular hooks
   const { transcribe, isTranscribing } = useSpeech();
   const { evaluate, isEvaluating } = useEvaluation();
   const { generateReport, isGeneratingReport } = useReport();
-  const {
-    interviewData,
-    fetchLoading,
-    fetchError,
-    refetch,
-    generateFollowUp,
-  } = useInterview(id);
+  const { interviewData, fetchLoading, fetchError, refetch, generateFollowUp } =
+    useInterview(id);
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -57,7 +51,8 @@ export default function InterviewSession() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [cameraActive, setCameraActive] = useState(true);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [modelsLoadedSuccessfully, setModelsLoadedSuccessfully] = useState(false);
+  const [modelsLoadedSuccessfully, setModelsLoadedSuccessfully] =
+    useState(false);
   const [detectedEmotion, setDetectedEmotion] =
     useState<string>("Initializing...");
   const [emotionLog, setEmotionLog] = useState<any[]>([]);
@@ -78,7 +73,8 @@ export default function InterviewSession() {
       }
       if (interviewData.questions && interviewData.answers) {
         const unansweredIdx = interviewData.questions.findIndex(
-          (q: any) => !interviewData.answers.some((a: any) => a.questionId === q.id)
+          (q: any) =>
+            !interviewData.answers.some((a: any) => a.questionId === q.id),
         );
         if (unansweredIdx !== -1) {
           setCurrentIdx(unansweredIdx);
@@ -294,7 +290,8 @@ export default function InterviewSession() {
       await evaluate(currentQuestion.id, transcriptText, emotionLog);
 
       // Check if this is the last question
-      const isLastQuestion = currentIdx >= totalQuestions - 1 || currentIdx >= questions.length - 1;
+      const isLastQuestion =
+        currentIdx >= totalQuestions - 1 || currentIdx >= questions.length - 1;
 
       if (isLastQuestion) {
         // 3. Compile final report
@@ -361,7 +358,6 @@ export default function InterviewSession() {
             <span className="text-xs bg-green-100 border border-green-200/50 text-green-700 px-4 py-1.5 rounded-full font-bold">
               QUESTION {currentIdx + 1} OF {questions.length}
             </span>
-            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -461,13 +457,13 @@ export default function InterviewSession() {
                 {submitMutation.isPending ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {isTranscribing 
-                      ? "Transcribing Voice Response..." 
-                      : isEvaluating 
-                      ? "Evaluating Answer & Composure..." 
-                      : isGeneratingReport 
-                      ? "Compiling Comprehensive Report..." 
-                      : "Analyzing and Evaluating..."}
+                    {isTranscribing
+                      ? "Transcribing Voice Response..."
+                      : isEvaluating
+                        ? "Evaluating Answer & Composure..."
+                        : isGeneratingReport
+                          ? "Compiling Comprehensive Report..."
+                          : "Analyzing and Evaluating..."}
                   </span>
                 ) : (
                   <>
