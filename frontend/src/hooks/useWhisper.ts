@@ -11,8 +11,8 @@ export function useWhisper() {
     try {
       const response = await whisperService.transcribe(audioBlob, questionId);
       return response;
-    } catch (err: any) {
-      const message = err.response?.data?.message || err.message || "Failed to transcribe audio";
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message || (err as { message?: string }).message || "Failed to transcribe audio";
       setError(message);
       throw err;
     } finally {

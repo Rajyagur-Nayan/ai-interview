@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import {
-  Play,
   Cpu,
   Mic,
   Square,
@@ -23,11 +22,12 @@ import { useInterview } from "@/hooks/useInterview";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useEvaluation } from "@/hooks/useEvaluation";
 import { useReport } from "@/hooks/useReport";
+import type { ComposureLogItem } from "@/hooks/useEmotionDetection";
 
 export default function InterviewSession() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
-  const { user } = useAuthStore();
+  useAuthStore();
 
   // Groq AI modular hooks
   const { transcribe, isTranscribing } = useSpeech();
@@ -54,7 +54,7 @@ export default function InterviewSession() {
     useState(false);
   const [detectedEmotion, setDetectedEmotion] =
     useState<string>("Initializing...");
-  const [emotionLog, setEmotionLog] = useState<any[]>([]);
+  const [emotionLog, setEmotionLog] = useState<ComposureLogItem[]>([]);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -72,8 +72,8 @@ export default function InterviewSession() {
       }
       if (interviewData.questions && interviewData.answers) {
         const unansweredIdx = interviewData.questions.findIndex(
-          (q: any) =>
-            !interviewData.answers.some((a: any) => a.questionId === q.id),
+          (q: { id: string; questionText: string }) =>
+            !interviewData.answers.some((a: { questionId: string }) => a.questionId === q.id),
         );
         if (unansweredIdx !== -1) {
           setCurrentIdx(unansweredIdx);
@@ -85,7 +85,7 @@ export default function InterviewSession() {
   }, [interviewData, id, router]);
 
   // TTS Voice Synthesis for Questions
-  const speakQuestion = () => {
+  const speakQuestion = useCallback(() => {
     if (!currentQuestion) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(
@@ -97,13 +97,13 @@ export default function InterviewSession() {
       voices.find((v) => v.lang.startsWith("en")) || voices[0];
     if (defaultVoice) utterance.voice = defaultVoice;
     window.speechSynthesis.speak(utterance);
-  };
+  }, [currentQuestion]);
 
   useEffect(() => {
     if (currentQuestion) {
       speakQuestion();
     }
-  }, [currentIdx, currentQuestion]);
+  }, [currentIdx, currentQuestion, speakQuestion]);
 
   // Load face-api weights
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function InterviewSession() {
   // Handle webcam streaming and expression detection
   useEffect(() => {
     let isMounted = true;
-    let detectInterval: any = null;
+    let detectInterval: NodeJS.Timeout | null = null;
     let localStream: MediaStream | null = null;
 
     async function startVideo() {
@@ -177,7 +177,7 @@ export default function InterviewSession() {
                   .withFaceExpressions();
 
                 if (detections && isMounted) {
-                  const expressions: any = detections.expressions;
+                  const expressions = detections.expressions as unknown as Record<string, number>;
                   let maxExpr = "neutral";
                   let maxVal = 0;
                   Object.keys(expressions).forEach((key) => {
@@ -194,7 +194,7 @@ export default function InterviewSession() {
                   setEmotionLog((prev) => [
                     ...prev,
                     {
-                      timestamp: new Date(),
+                      timestamp: new Date().toISOString(),
                       emotion: capitalized,
                       confidence: maxVal,
                     },
@@ -228,7 +228,7 @@ export default function InterviewSession() {
         streamRef.current = null;
       }
     };
-  }, [modelsLoaded, cameraActive]);
+  }, [modelsLoaded, cameraActive, modelsLoadedSuccessfully]);
 
   // Audio Recorder logic
   const startRecording = async () => {
@@ -275,7 +275,7 @@ export default function InterviewSession() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!currentQuestion) return;
+      if (!currentQuestion) return { finished: false };
 
       let transcriptText = "";
       if (audioBlob) {
@@ -302,7 +302,7 @@ export default function InterviewSession() {
         return { finished: false };
       }
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { finished: boolean }) => {
       setAudioBlob(null);
       setAudioUrl(null);
       setEmotionLog([]);

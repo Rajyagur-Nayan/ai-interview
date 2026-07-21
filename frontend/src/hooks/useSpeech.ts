@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { aiInterviewService, WhisperResponse } from "../services/aiInterview.service";
+import { aiInterviewService } from "../services/aiInterview.service";
+import type { WhisperResponse } from "../services/aiInterview.service";
 
 export function useSpeech() {
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -10,8 +11,9 @@ export function useSpeech() {
     setError(null);
     try {
       return await aiInterviewService.transcribe(audioBlob, questionId);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || "Failed to transcribe audio";
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = error.response?.data?.message || error.message || "Failed to transcribe audio";
       setError(msg);
       throw err;
     } finally {

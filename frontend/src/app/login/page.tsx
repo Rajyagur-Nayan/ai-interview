@@ -44,8 +44,9 @@ export default function LoginPage() {
       } else {
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid credentials. Please check your credentials.");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setError(axiosErr.response?.data?.message || "Invalid credentials. Please check your credentials.");
     } finally {
       setIsSubmitting(false);
     }
@@ -140,7 +141,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-sm text-neutral-500 mt-8">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/register" className="text-green-500 hover:underline font-bold transition-colors">
             Register for free
           </Link>

@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const response = await api.post("/auth/refresh");
         const { accessToken, user } = response.data.data;
         setAuth(accessToken, user);
-      } catch (error) {
+      } catch {
         clearAuth();
       } finally {
         setLoading(false);

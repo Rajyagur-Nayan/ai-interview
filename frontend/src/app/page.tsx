@@ -5,10 +5,8 @@ import Link from "next/link";
 import {
   Sparkles,
   AudioLines,
-  Users,
   Award,
   Play,
-  ShieldAlert,
   Cpu,
   HeartPulse,
 } from "lucide-react";

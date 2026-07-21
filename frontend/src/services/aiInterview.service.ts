@@ -1,4 +1,5 @@
 import api from "./api";
+import type { ComposureLogItem } from "@/hooks/useEmotionDetection";
 
 export interface QuestionResponse {
   success: boolean;
@@ -56,7 +57,7 @@ export const aiInterviewService = {
     return response.data;
   },
 
-  async evaluate(questionId: string, transcript: string, emotions: any[] = []): Promise<EvaluationResponse> {
+  async evaluate(questionId: string, transcript: string, emotions: ComposureLogItem[] = []): Promise<EvaluationResponse> {
     const response = await api.post<EvaluationResponse>("/interview/evaluate", {
       questionId,
       transcript,

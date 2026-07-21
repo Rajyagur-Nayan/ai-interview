@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { aiInterviewService, EvaluationResponse } from "../services/aiInterview.service";
+import type { ComposureLogItem } from "./useEmotionDetection";
 
 export function useEvaluation() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const evaluate = async (questionId: string, transcript: string, emotions: any[] = []): Promise<EvaluationResponse> => {
+  const evaluate = async (questionId: string, transcript: string, emotions: ComposureLogItem[] = []): Promise<EvaluationResponse> => {
     setIsEvaluating(true);
     setError(null);
     try {
       return await aiInterviewService.evaluate(questionId, transcript, emotions);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || "Failed to evaluate response";
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = error.response?.data?.message || error.message || "Failed to evaluate response";
       setError(msg);
       throw err;
     } finally {

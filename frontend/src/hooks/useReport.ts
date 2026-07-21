@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { aiInterviewService, ReportResponse } from "../services/aiInterview.service";
+import { aiInterviewService } from "../services/aiInterview.service";
+import type { ReportResponse } from "../services/aiInterview.service";
 
 export function useReport() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -10,8 +11,9 @@ export function useReport() {
     setError(null);
     try {
       return await aiInterviewService.generateReport(interviewId);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || "Failed to generate interview report";
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = error.response?.data?.message || error.message || "Failed to generate interview report";
       setError(msg);
       throw err;
     } finally {

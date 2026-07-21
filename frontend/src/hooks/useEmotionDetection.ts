@@ -120,7 +120,7 @@ export function useEmotionDetection(cameraActive: boolean) {
               .withFaceExpressions();
 
             if (detections && isMounted) {
-              const expressions: any = detections.expressions;
+               const expressions = detections.expressions as unknown as Record<string, number>;
               let maxExpr = "neutral";
               let maxVal = 0;
 
@@ -150,7 +150,7 @@ export function useEmotionDetection(cameraActive: boolean) {
       isMounted = false;
       if (detectInterval) clearInterval(detectInterval);
     };
-  }, [modelsLoaded, cameraActive]);
+  }, [modelsLoaded, cameraActive, modelsLoadedSuccessfully]);
 
   // 4. Samples the dominant emotion from the buffer precisely every 5 seconds
   useEffect(() => {

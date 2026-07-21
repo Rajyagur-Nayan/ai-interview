@@ -48,8 +48,9 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push("/login");
       }, 1500);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Registration failed. Try again.");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setError(axiosErr.response?.data?.message || "Registration failed. Try again.");
     } finally {
       setIsSubmitting(false);
     }

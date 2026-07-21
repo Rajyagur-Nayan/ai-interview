@@ -28,8 +28,9 @@ export function useInterview(interviewId?: string) {
       // Invalidate query to pull the newly inserted question
       await queryClient.invalidateQueries({ queryKey: ["interview-session", interviewId] });
       return result;
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || "Failed to generate follow-up question";
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = error.response?.data?.message || error.message || "Failed to generate follow-up question";
       setError(msg);
       throw err;
     } finally {
@@ -42,8 +43,9 @@ export function useInterview(interviewId?: string) {
     setError(null);
     try {
       return await aiInterviewService.generateQuestion(role, experienceLevel, difficulty, count);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || "Failed to generate question";
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = error.response?.data?.message || error.message || "Failed to generate question";
       setError(msg);
       throw err;
     } finally {

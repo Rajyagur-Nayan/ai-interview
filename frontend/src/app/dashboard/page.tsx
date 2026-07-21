@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     try {
       await api.post("/auth/logout");
-    } catch (err) {
+    } catch {
       // Continue clearing local state regardless
     } finally {
       clearAuth();
@@ -45,7 +45,7 @@ export default function DashboardPage() {
 
   const pastInterviews = historyData || [];
   const completedInterviews = pastInterviews.filter(
-    (i: any) => i.status === "completed",
+    (i: { status: string }) => i.status === "completed",
   );
 
   return (
@@ -191,7 +191,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-sm">
-                  {pastInterviews.map((interview: any) => (
+                  {pastInterviews.map((interview: { id: string; role: string; difficulty: string; status: string; createdAt: string }) => (
                     <tr
                       key={interview.id}
                       className="hover:bg-[#F8FAF8]/60 transition-colors"

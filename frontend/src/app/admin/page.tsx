@@ -45,7 +45,7 @@ export default function AdminPage() {
   const handleLogout = async () => {
     try {
       await api.post("/auth/logout");
-    } catch (err) {
+    } catch {
       // Continue clearing local state
     } finally {
       clearAuth();
@@ -54,7 +54,7 @@ export default function AdminPage() {
   };
 
   const roleData = analytics?.roleDistribution || [];
-  const chartData = roleData.map((item: any) => ({
+  const chartData = roleData.map((item: { role: string; count: number | string }) => ({
     name: item.role,
     Sessions: Number(item.count),
   }));

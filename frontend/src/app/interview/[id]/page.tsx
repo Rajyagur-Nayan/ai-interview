@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuthStore } from "@/store/authStore";
+import { useMutation } from "@tanstack/react-query";
 import { Cpu, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 import AudioRecorder from "@/components/AudioRecorder";
 import TTSAudioPlayer from "@/components/TTSAudioPlayer";
@@ -17,8 +16,6 @@ import { useReport } from "@/hooks/useReport";
 export default function InterviewSessionPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
-  const { user } = useAuthStore();
-  const queryClient = useQueryClient();
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -54,8 +51,8 @@ export default function InterviewSessionPage() {
       }
       if (interviewData.questions && interviewData.answers) {
         const unansweredIdx = interviewData.questions.findIndex(
-          (q: any) =>
-            !interviewData.answers.some((a: any) => a.questionId === q.id),
+          (q: { id: string }) =>
+            !interviewData.answers.some((a: { questionId: string }) => a.questionId === q.id),
         );
         if (unansweredIdx !== -1) {
           setCurrentIdx(unansweredIdx);

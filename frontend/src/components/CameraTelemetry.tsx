@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Video, VideoOff, Loader2, Sparkles, Activity, ShieldAlert, Heart, Calendar } from "lucide-react";
+import { Video, VideoOff, Sparkles, Activity, ShieldAlert, Calendar } from "lucide-react";
 import { ComposureLogItem } from "@/hooks/useEmotionDetection";
 
 interface CameraTelemetryProps {

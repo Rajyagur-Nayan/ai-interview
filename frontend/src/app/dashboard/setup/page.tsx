@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
-import { useAuthStore } from "@/store/authStore";
 import { useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -37,11 +36,9 @@ type SetupFields = z.infer<typeof setupSchema>;
 
 export default function InterviewSetupPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
 
   const {
-    register,
     handleSubmit,
     setValue,
     watch,
@@ -82,7 +79,7 @@ export default function InterviewSetupPage() {
     onSuccess: (data) => {
       router.push(`/interview/${data.interview.id}`);
     },
-    onError: (err: any) => {
+    onError: (err: Error & { response?: { data?: { message?: string } } }) => {
       setError(
         err.response?.data?.message ||
           "Failed to start mock session. Try again.",

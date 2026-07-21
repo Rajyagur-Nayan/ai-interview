@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import {
-  Award,
   Cpu,
   CheckCircle2,
   ChevronLeft,
@@ -35,7 +34,6 @@ import {
 
 export default function ReportPage() {
   const { id } = useParams() as { id: string };
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -80,11 +78,11 @@ export default function ReportPage() {
   const { role, difficulty, createdAt, questions, answers } = reportData;
 
   // Calculate scores
-  const scoreAnswers = answers.filter((a: any) => a.score !== null);
+  const scoreAnswers = answers.filter((a: { score: number | null }) => a.score !== null);
   const averageScore =
     scoreAnswers.length > 0
       ? Math.round(
-          scoreAnswers.reduce((sum: number, a: any) => sum + a.score, 0) /
+          scoreAnswers.reduce((sum: number, a: { score: number }) => sum + a.score, 0) /
             scoreAnswers.length,
         )
       : 0;
@@ -112,14 +110,14 @@ export default function ReportPage() {
 
   // Helpers to fetch answer for question
   const getAnswerForQuestion = (qid: string) => {
-    return answers.find((a: any) => a.questionId === qid);
+    return answers.find((a: { questionId: string }) => a.questionId === qid);
   };
 
   // Helper to compile emotions logged
-  const compileEmotionPercentages = (emotionsList: any[]) => {
+  const compileEmotionPercentages = (emotionsList: { emotion?: string }[]) => {
     if (!emotionsList || emotionsList.length === 0) return "Neutral (100%)";
     const counts: { [key: string]: number } = {};
-    emotionsList.forEach((e: any) => {
+    emotionsList.forEach((e: { emotion?: string }) => {
       if (e.emotion) {
         counts[e.emotion] = (counts[e.emotion] || 0) + 1;
       }
@@ -423,7 +421,7 @@ export default function ReportPage() {
 
               <div className="mt-4 p-4 rounded-2xl bg-[#F8FAF8] border border-neutral-200">
                 <p className="text-xs text-neutral-700 font-bold leading-relaxed italic">
-                  "{report.emotionSummary}"
+                  &ldquo;{report.emotionSummary}&rdquo;
                 </p>
               </div>
             </div>
@@ -502,7 +500,7 @@ export default function ReportPage() {
         <div className="bg-white border border-neutral-200/80 shadow-sm p-8 rounded-[28px] border-l-4 border-l-green-500 space-y-4">
           <h3 className="text-base font-extrabold text-neutral-900 flex items-center gap-2">
             <BookOpen className="w-4.5 h-4.5 text-green-600" />
-            Recruiter's Actionable Recommendations
+            Recruiter&apos;s Actionable Recommendations
           </h3>
           <p className="text-xs text-neutral-500 leading-relaxed font-bold">
             Based on core logic matching and biometric parameters, we recommend
@@ -527,7 +525,7 @@ export default function ReportPage() {
             Question-by-Question Diagnostics
           </h2>
 
-          {questions.map((question: any, idx: number) => {
+          {questions.map((question: { id: string; questionText: string }, idx: number) => {
             const answer = getAnswerForQuestion(question.id);
             return (
               <div
@@ -560,7 +558,7 @@ export default function ReportPage() {
                         Response Transcript
                       </span>
                       <p className="text-neutral-700 bg-[#F8FAF8] p-5 rounded-2xl border border-neutral-200 leading-relaxed font-bold">
-                        "{answer.transcript}"
+                        &ldquo;{answer.transcript}&rdquo;
                       </p>
                     </div>
 
