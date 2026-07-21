@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { api } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
 import {
   Play,
@@ -303,7 +302,7 @@ export default function InterviewSession() {
         return { finished: false };
       }
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setAudioBlob(null);
       setAudioUrl(null);
       setEmotionLog([]);

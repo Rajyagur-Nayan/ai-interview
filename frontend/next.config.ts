@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  optimizeFonts: false,
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
