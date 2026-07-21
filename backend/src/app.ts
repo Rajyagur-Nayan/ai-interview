@@ -24,7 +24,10 @@ app.use(helmet());
 app.use(loggerMiddleware);
 app.use(
   cors({
-    origin: ["http://localhost:3000", "ai-interview-ksob-lilac.vercel.app"],
+    origin: [
+      "http://localhost:3000",
+      "https://ai-interview-ksob-lilac.vercel.app",
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
