@@ -3,12 +3,14 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const refreshToken = request.cookies.get("refreshToken")?.value;
+  console.log("Middleware refresh token:", refreshToken);
   const { pathname } = request.nextUrl;
 
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");
-  const isProtectedRoute = 
-    pathname.startsWith("/dashboard") || 
-    pathname.startsWith("/interview") || 
+  const isAuthRoute =
+    pathname.startsWith("/login") || pathname.startsWith("/register");
+  const isProtectedRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/interview") ||
     pathname.startsWith("/admin");
 
   if (isProtectedRoute && !refreshToken) {
