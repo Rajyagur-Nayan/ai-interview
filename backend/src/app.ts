@@ -24,11 +24,11 @@ app.use(helmet());
 app.use(loggerMiddleware);
 app.use(
   cors({
-    origin: ["http://localhost:3000"],
+    origin: ["http://localhost:3000", "ai-interview-ksob-lilac.vercel.app/"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 app.use(cookieParser());
 
@@ -59,7 +59,9 @@ app.use(errorHandler);
 // Start Server
 if (process.env.NODE_ENV !== "test") {
   app.listen(port, () => {
-    console.log(`[Server] Running in ${process.env.NODE_ENV || "development"} mode on port ${port}`);
+    console.log(
+      `[Server] Running in ${process.env.NODE_ENV || "development"} mode on port ${port}`,
+    );
   });
 }
 
