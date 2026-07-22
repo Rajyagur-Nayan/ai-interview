@@ -12,6 +12,6 @@ router.post("/register", authLimiter, validateRequest(registerSchema), (req, res
 router.post("/login", authLimiter, validateRequest(loginSchema), (req, res, next) => controller.login(req, res, next));
 router.post("/refresh", (req, res, next) => controller.refresh(req, res, next));
 router.post("/logout", (req, res, next) => controller.logout(req, res, next));
-router.get("/me", authenticate, (req, res, next) => controller.getMe(req, res, next));
+router.get("/me", (req, res, next) => controller.getMe(req, res, next));
 
 export default router;

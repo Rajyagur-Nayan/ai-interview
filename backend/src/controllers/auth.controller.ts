@@ -169,13 +169,20 @@ export class AuthController {
 
   async getMe(req: Request, res: Response, next: NextFunction) {
     try {
-      if (!req.user) {
-        throw new UnauthorizedError("Not authenticated");
+      const refreshToken = req.cookies?.refreshToken;
+      if (!refreshToken) {
+        throw new UnauthorizedError("Refresh token missing");
       }
-      const user = await userRepository.findById(req.user.id);
-      if (!user) {
-        throw new UnauthorizedError("User no longer exists");
+
+      // Verify JWT refreshToken signature & expiration
+      const decoded = authService.verifyRefreshToken(refreshToken);
+
+      // Load user from database
+      const user = await userRepository.findById(decoded.id);
+      if (!user || user.refreshToken !== refreshToken) {
+        throw new UnauthorizedError("Invalid or expired session");
       }
+
       res.status(200).json({
         status: "success",
         data: {
