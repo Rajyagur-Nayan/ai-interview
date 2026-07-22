@@ -22,10 +22,11 @@ export default function AudioRecorder({ onRecordingComplete, onReset }: AudioRec
 
   // Stop everything when component unmounts
   useEffect(() => {
+    const audioPlayer = audioPlayerRef.current;
     return () => {
       stopRecordingSession();
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.pause();
+      if (audioPlayer) {
+        audioPlayer.pause();
       }
     };
   }, []);
