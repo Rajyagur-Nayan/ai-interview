@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import * as faceapi from "face-api.js";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useBehaviorAnalysis } from "@/features/emotion";
+import { AnswerAnalyticsSummary } from "@/features/emotion";
 
 export interface ComposureLogItem {
   timestamp: string;
@@ -10,39 +11,26 @@ export interface ComposureLogItem {
 }
 
 export function useEmotionDetection(cameraActive: boolean) {
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [modelsLoadedSuccessfully, setModelsLoadedSuccessfully] = useState(false);
-  const [detectedEmotion, setDetectedEmotion] = useState<string>("Initializing...");
-  const [emotionLog, setEmotionLog] = useState<ComposureLogItem[]>([]);
-  
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  
-  const emotionBufferRef = useRef<{ emotion: string; confidence: number }[]>([]);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [emotionLog, setEmotionLog] = useState<ComposureLogItem[]>([]);
 
-  // 1. Load face-api models
-  useEffect(() => {
-    async function loadModels() {
-      try {
-        const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-        setModelsLoaded(true);
-        setModelsLoadedSuccessfully(true);
-        setDetectedEmotion("Neutral");
-      } catch (err) {
-        console.error("Failed to load face-api models:", err);
-        // Fallback gracefully so the candidate is not blocked
-        setModelsLoaded(true);
-        setModelsLoadedSuccessfully(false);
-        setDetectedEmotion("Focused");
-      }
-    }
-    loadModels();
-  }, []);
+  // Integrated Behavior Analysis Engine
+  const {
+    isWorkerReady,
+    workerError,
+    liveMetrics,
+    liveExpressions,
+    faceStatus,
+    startAnswerTracking,
+    stopAnswerTracking,
+  } = useBehaviorAnalysis({
+    cameraActive,
+    videoRef,
+    analysisFps: 5,
+  });
 
-  // 2. Manage Video Stream
+  // Manage Video Stream (Reuse existing camera stream)
   useEffect(() => {
     let isMounted = true;
     let localStream: MediaStream | null = null;
@@ -58,7 +46,7 @@ export function useEmotionDetection(cameraActive: boolean) {
           video: { width: 400, height: 300, facingMode: "user" },
           audio: false,
         });
-        
+
         if (!isMounted) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -76,9 +64,7 @@ export function useEmotionDetection(cameraActive: boolean) {
       }
     }
 
-    if (modelsLoaded) {
-      startVideo();
-    }
+    startVideo();
 
     return () => {
       isMounted = false;
@@ -87,7 +73,7 @@ export function useEmotionDetection(cameraActive: boolean) {
       }
       stopVideo();
     };
-  }, [modelsLoaded, cameraActive]);
+  }, [cameraActive]);
 
   const stopVideo = () => {
     if (streamRef.current) {
@@ -99,139 +85,53 @@ export function useEmotionDetection(cameraActive: boolean) {
     }
   };
 
-  // 3. Classification loop (every 1 second) and logging buffer
+  // Derive active expression text for backward compatibility
+  const detectedEmotion = liveExpressions.isSmiling
+    ? "Focused / Smiling"
+    : faceStatus === "missing"
+    ? "Face Missing"
+    : liveMetrics.confidence > 70
+    ? "Confident / Focused"
+    : "Neutral / Focused";
+
+  // Interval logging (samples live snapshot every 5 seconds for telemetry UI)
   useEffect(() => {
-    let detectInterval: NodeJS.Timeout | null = null;
-    let isMounted = true;
+    if (!cameraActive) return;
 
-    if (modelsLoaded && modelsLoadedSuccessfully && cameraActive) {
-      detectInterval = setInterval(async () => {
-        const video = videoRef.current;
-        if (
-          video &&
-          cameraActive &&
-          video.readyState >= 2 &&
-          video.videoWidth > 0 &&
-          video.videoHeight > 0
-        ) {
-          try {
-            const detections = await faceapi
-              .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-              .withFaceExpressions();
+    const interval = setInterval(() => {
+      setEmotionLog((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          emotion: detectedEmotion,
+          confidence: Number((liveMetrics.confidence / 100).toFixed(2)),
+        },
+      ]);
+    }, 5000);
 
-            if (detections && isMounted) {
-               const expressions = detections.expressions as unknown as Record<string, number>;
-              let maxExpr = "neutral";
-              let maxVal = 0;
+    return () => clearInterval(interval);
+  }, [cameraActive, detectedEmotion, liveMetrics.confidence]);
 
-              // Filter out Happy, Sad, Neutral, Angry, Fearful, Surprised
-              const supportedEmotions = ["happy", "sad", "neutral", "angry", "fearful", "surprised"];
-              Object.keys(expressions).forEach((key) => {
-                if (supportedEmotions.includes(key) && expressions[key] > maxVal) {
-                  maxVal = expressions[key];
-                  maxExpr = key;
-                }
-              });
-
-              const capitalized = maxExpr.charAt(0).toUpperCase() + maxExpr.slice(1);
-              setDetectedEmotion(capitalized);
-
-              // Add to buffer
-              emotionBufferRef.current.push({ emotion: capitalized, confidence: maxVal });
-            }
-          } catch (e) {
-            console.debug("Face detection tick error:", e);
-          }
-        }
-      }, 1000);
-    }
-
-    return () => {
-      isMounted = false;
-      if (detectInterval) clearInterval(detectInterval);
-    };
-  }, [modelsLoaded, cameraActive, modelsLoadedSuccessfully]);
-
-  // 4. Samples the dominant emotion from the buffer precisely every 5 seconds
-  useEffect(() => {
-    if (modelsLoaded && cameraActive) {
-      intervalRef.current = setInterval(() => {
-        const buffer = emotionBufferRef.current;
-        if (buffer.length === 0) {
-          // If no detections, log a neutral snapshot
-          setEmotionLog((prev) => [
-            ...prev,
-            { timestamp: new Date().toISOString(), emotion: "Neutral", confidence: 1.0 },
-          ]);
-          return;
-        }
-
-        // Tally emotion frequencies
-        const counts: Record<string, { count: number; totalConf: number }> = {};
-        buffer.forEach((item) => {
-          if (!counts[item.emotion]) {
-            counts[item.emotion] = { count: 0, totalConf: 0 };
-          }
-          counts[item.emotion].count += 1;
-          counts[item.emotion].totalConf += item.confidence;
-        });
-
-        // Determine dominant emotion
-        let dominantEmotion = "Neutral";
-        let maxCount = 0;
-        let dominantConfidence = 1.0;
-
-        Object.keys(counts).forEach((emotion) => {
-          if (counts[emotion].count > maxCount) {
-            maxCount = counts[emotion].count;
-            dominantEmotion = emotion;
-            dominantConfidence = counts[emotion].totalConf / counts[emotion].count;
-          }
-        });
-
-        // Log dominant emotion
-        setEmotionLog((prev) => [
-          ...prev,
-          {
-            timestamp: new Date().toISOString(),
-            emotion: dominantEmotion,
-            confidence: Number(dominantConfidence.toFixed(2)),
-          },
-        ]);
-
-        // Clear buffer
-        emotionBufferRef.current = [];
-      }, 5000);
-    }
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [modelsLoaded, cameraActive]);
-
-  // Clean log callback
-  const resetLog = () => {
+  const resetLog = useCallback(() => {
     setEmotionLog([]);
-    emotionBufferRef.current = [];
-  };
+  }, []);
 
-  // Generate Summary Metrics
-  const getEmotionSummary = () => {
-    const summary: Record<string, number> = {};
-    if (emotionLog.length === 0) return summary;
-
+  const getEmotionSummary = useCallback(() => {
+    if (emotionLog.length === 0) {
+      return { "Focused / Composed": 100 };
+    }
+    const counts: Record<string, number> = {};
     emotionLog.forEach((item) => {
-      summary[item.emotion] = (summary[item.emotion] || 0) + 1;
+      counts[item.emotion] = (counts[item.emotion] || 0) + 1;
     });
 
-    // Convert counts to percentages
+    const summary: Record<string, number> = {};
     const total = emotionLog.length;
-    Object.keys(summary).forEach((key) => {
-      summary[key] = Math.round((summary[key] / total) * 100);
+    Object.keys(counts).forEach((key) => {
+      summary[key] = Math.round((counts[key] / total) * 100);
     });
-
     return summary;
-  };
+  }, [emotionLog]);
 
   return {
     videoRef,
@@ -239,6 +139,12 @@ export function useEmotionDetection(cameraActive: boolean) {
     emotionLog,
     resetLog,
     getEmotionSummary,
-    modelsLoaded,
+    modelsLoaded: isWorkerReady,
+    workerError,
+    liveMetrics,
+    liveExpressions,
+    faceStatus,
+    startAnswerTracking,
+    stopAnswerTracking,
   };
 }

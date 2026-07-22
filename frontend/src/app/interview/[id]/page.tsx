@@ -27,7 +27,7 @@ export default function InterviewSessionPage() {
   const { interviewData, fetchLoading, fetchError, refetch, generateFollowUp } =
     useInterview(id);
 
-  // Camera & face-api states hook integration
+  // Camera & MediaPipe FaceLandmarker behavior analysis integration
   const [cameraActive, setCameraActive] = useState(true);
   const {
     videoRef,
@@ -36,6 +36,12 @@ export default function InterviewSessionPage() {
     resetLog,
     getEmotionSummary,
     modelsLoaded,
+    liveMetrics,
+    liveExpressions,
+    faceStatus,
+    startAnswerTracking,
+    stopAnswerTracking,
+    workerError,
   } = useEmotionDetection(cameraActive);
 
   const questions = interviewData?.questions || [];
@@ -52,7 +58,7 @@ export default function InterviewSessionPage() {
       if (interviewData.questions && interviewData.answers) {
         const unansweredIdx = interviewData.questions.findIndex(
           (q: { id: string }) =>
-            !interviewData.answers.some((a: { questionId: string }) => a.questionId === q.id),
+            !interviewData.answers.some((a: { questionId: string }) => a.questionId === q.id)
         );
         if (unansweredIdx !== -1) {
           setCurrentIdx(unansweredIdx);
@@ -63,6 +69,13 @@ export default function InterviewSessionPage() {
     }
   }, [interviewData, id, router]);
 
+  // Start answer tracking when question activates or recording starts
+  useEffect(() => {
+    if (currentQuestion) {
+      startAnswerTracking(currentQuestion.id);
+    }
+  }, [currentQuestion, startAnswerTracking]);
+
   // Submit Answer mutation
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -70,15 +83,19 @@ export default function InterviewSessionPage() {
 
       let transcriptText = "";
       if (audioBlob) {
-        // 1. Transcribe audio using Groq Whisper
+        // 1. Transcribe audio using Speech service
         const sttResult = await transcribe(audioBlob, currentQuestion.id);
         transcriptText = sttResult.transcript;
       } else {
         transcriptText = "This is technical practice verbal input.";
       }
 
-      // 2. Evaluate answer using Llama 3.1 8B (combined technical & communication scores)
-      await evaluate(currentQuestion.id, transcriptText, emotionLog);
+      // 2. Stop answer biometrics tracking & compile summarized analytics
+      const summaryAnalytics = stopAnswerTracking();
+      const analyticsData = summaryAnalytics || emotionLog;
+
+      // 3. Evaluate answer with summarized biometrics JSON
+      await evaluate(currentQuestion.id, transcriptText, analyticsData as any);
 
       // Check if this is the last question
       const allQuestions = interviewData?.questions || [];
@@ -87,11 +104,11 @@ export default function InterviewSessionPage() {
         currentIdx >= allQuestions.length - 1;
 
       if (isLastQuestion) {
-        // 3. Compile final report
+        // Compile final report
         await generateReport(id);
         return { finished: true };
       } else {
-        // 4. Generate follow-up question
+        // Generate follow-up question
         await generateFollowUp(currentQuestion.questionText, transcriptText);
         return { finished: false };
       }
@@ -126,7 +143,7 @@ export default function InterviewSessionPage() {
   if (fetchError || !interviewData) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-neutral-400 gap-3 min-h-screen bg-white">
-        <AlertCircle className="w-12 h-12 text-red-550" />
+        <AlertCircle className="w-12 h-12 text-red-500" />
         <p className="text-sm font-semibold text-neutral-600">
           Error fetching interview session workspace
         </p>
@@ -224,7 +241,7 @@ export default function InterviewSessionPage() {
                     {isTranscribing
                       ? "Transcribing Voice Response..."
                       : isEvaluating
-                        ? "Evaluating Answer & Composure..."
+                        ? "Evaluating Answer & Behavior..."
                         : isGeneratingReport
                           ? "Compiling Comprehensive Report..."
                           : "Analyzing and Evaluating..."}
@@ -240,7 +257,7 @@ export default function InterviewSessionPage() {
           </div>
         </div>
 
-        {/* Right Side: Cam Feed & AI Emotion Analytics */}
+        {/* Right Side: Cam Feed & AI Behavior Analytics */}
         <div className="lg:col-span-2 flex flex-col">
           <CameraTelemetry
             videoRef={videoRef}
@@ -250,6 +267,10 @@ export default function InterviewSessionPage() {
             emotionLog={emotionLog}
             modelsLoaded={modelsLoaded}
             getEmotionSummary={getEmotionSummary}
+            liveMetrics={liveMetrics}
+            liveExpressions={liveExpressions}
+            faceStatus={faceStatus}
+            workerError={workerError}
           />
         </div>
       </div>

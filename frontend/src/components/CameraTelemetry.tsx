@@ -3,6 +3,9 @@
 import React from "react";
 import { Video, VideoOff, Sparkles, Activity, ShieldAlert, Calendar } from "lucide-react";
 import { ComposureLogItem } from "@/hooks/useEmotionDetection";
+import { BehaviorAnalyticsOverlay } from "@/features/emotion";
+import { InterviewBehaviorMetrics } from "@/features/emotion";
+import { ExpressionResult } from "@/features/emotion";
 
 interface CameraTelemetryProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -12,6 +15,10 @@ interface CameraTelemetryProps {
   emotionLog: ComposureLogItem[];
   modelsLoaded: boolean;
   getEmotionSummary: () => Record<string, number>;
+  liveMetrics?: InterviewBehaviorMetrics;
+  liveExpressions?: ExpressionResult;
+  faceStatus?: "visible" | "missing" | "occluded" | "out_of_frame";
+  workerError?: string | null;
 }
 
 export default function CameraTelemetry({
@@ -22,10 +29,13 @@ export default function CameraTelemetry({
   emotionLog,
   modelsLoaded,
   getEmotionSummary,
+  liveMetrics,
+  liveExpressions,
+  faceStatus = "visible",
+  workerError = null,
 }: CameraTelemetryProps) {
   const emotionSummary = getEmotionSummary();
 
-  // Color mapping helper for different emotions
   const getEmotionColor = (emotion: string) => {
     switch (emotion.toLowerCase()) {
       case "happy":
@@ -92,13 +102,13 @@ export default function CameraTelemetry({
             {/* Soft status overlay pill */}
             <div className="absolute top-4 left-4 bg-white/90 backdrop-blur border border-neutral-200/60 rounded-full px-3 py-1 flex items-center gap-1.5 text-[10px] uppercase font-extrabold tracking-wider text-neutral-600 shadow-sm">
               <span className={`w-2 h-2 rounded-full ${modelsLoaded ? "bg-green-500 animate-pulse" : "bg-amber-500 animate-ping"}`} />
-              {modelsLoaded ? "Live Feed Active" : "Initializing Models..."}
+              {modelsLoaded ? "MediaPipe Worker Active" : "Initializing Engine..."}
             </div>
 
-            {/* Candidate Name Avatar Bubble */}
+            {/* Candidate Profile Avatar Bubble */}
             <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm border border-neutral-200/60 rounded-full px-3 py-1 flex items-center gap-2 text-xs font-bold text-neutral-700 shadow-sm">
               <div className="w-4 h-4 rounded-full bg-gradient-to-r from-green-400 to-green-500" />
-              Candidate Profile
+              Candidate Live Feed
             </div>
           </>
         ) : (
@@ -108,7 +118,7 @@ export default function CameraTelemetry({
           </div>
         )}
 
-        {/* Toggle Cam Button - Glassmorphism floating circle */}
+        {/* Toggle Cam Button */}
         <button
           onClick={() => setCameraActive(!cameraActive)}
           className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md hover:bg-white text-neutral-800 rounded-full w-10 h-10 transition-all cursor-pointer border border-neutral-200 shadow-sm flex items-center justify-center hover:scale-105 active:scale-95"
@@ -118,20 +128,29 @@ export default function CameraTelemetry({
         </button>
       </div>
 
-      {/* Biometric & Composure Dashboard */}
+      {/* Production-Ready Real-Time Behavior Overlay */}
+      {liveMetrics && liveExpressions && (
+        <BehaviorAnalyticsOverlay
+          metrics={liveMetrics}
+          expressions={liveExpressions}
+          faceStatus={faceStatus}
+          isWorkerReady={modelsLoaded}
+          workerError={workerError}
+        />
+      )}
+
+      {/* Composure Session Log Dashboard */}
       <div className="bg-white p-8 rounded-[32px] border border-neutral-200/80 flex-1 flex flex-col justify-between relative overflow-hidden shadow-lg">
-        {/* Glow effect matching detected emotion */}
         <div className={`absolute -right-24 -top-24 w-48 h-48 rounded-full filter blur-[60px] opacity-10 transition-all duration-1000 ${activeColor.progress}`} />
 
         <div className="space-y-6">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5 text-xs text-green-600 font-bold uppercase tracking-wider mb-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                Biometric Analytics
+                Interval Snapshot Feed
               </div>
-              <h3 className="text-lg font-extrabold text-neutral-900">Session Composure Feed</h3>
+              <h3 className="text-lg font-extrabold text-neutral-900">Session History</h3>
             </div>
             {modelsLoaded && cameraActive && (
               <div className="flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-100 px-3 py-1 rounded-full border border-green-200/50">
@@ -141,62 +160,14 @@ export default function CameraTelemetry({
             )}
           </div>
 
-          {/* Active Expression Panel */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`p-4 rounded-2xl border flex flex-col justify-between transition-all duration-305 ${activeColor.bg} ${activeColor.border} shadow-sm`}>
-              <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Current Expression</span>
-              <span className={`text-lg font-black mt-1.5 flex items-center gap-2 ${activeColor.text}`}>
-                {detectedEmotion}
-              </span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#F8FAF8] border border-neutral-200 flex flex-col justify-between">
-              <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Calibration Rate</span>
-              <span className="text-lg font-black text-neutral-800 mt-1.5 flex items-center gap-1.5">
-                5s Intervals
-              </span>
-            </div>
-          </div>
-
-          {/* Emotion Distribution summary */}
-          <div className="space-y-3.5">
-            <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Composure Distribution</h4>
-            {Object.keys(emotionSummary).length === 0 ? (
-              <div className="text-xs text-neutral-400 italic py-2">
-                Awaiting telemetry logs... Start answering to compile metrics.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {Object.entries(emotionSummary).map(([emotion, percentage]) => {
-                  const colors = getEmotionColor(emotion);
-                  return (
-                    <div key={emotion} className="space-y-1">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-neutral-700">{emotion}</span>
-                        <span className={colors.text}>{percentage}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${colors.progress}`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Composure Timeline snapshots */}
           <div className="space-y-3.5">
             <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-bold flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-              Interval Log History
+              Interval Telemetry Snapshots
             </h4>
-            <div className="max-h-[120px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+            <div className="max-h-[140px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
               {emotionLog.length === 0 ? (
-                <div className="text-xs text-neutral-400 italic">No telemetry logged yet.</div>
+                <div className="text-xs text-neutral-400 italic">No telemetry logged yet. Start speaking to record.</div>
               ) : (
                 [...emotionLog].reverse().slice(0, 5).map((log, index) => {
                   const colors = getEmotionColor(log.emotion);
@@ -219,11 +190,10 @@ export default function CameraTelemetry({
           </div>
         </div>
 
-        {/* Footer fallback info */}
         <div className="mt-6 border-t border-neutral-200 pt-4 flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-neutral-400" />
           <span className="text-[10px] text-neutral-400 font-bold">
-            Biometrics are tracked locally. No video stream content is uploaded to servers.
+            All facial biometrics are computed 100% inside your browser via Web Worker. No video frames leave your device.
           </span>
         </div>
       </div>

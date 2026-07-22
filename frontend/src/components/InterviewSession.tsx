@@ -17,12 +17,12 @@ import {
   Video,
   VideoOff,
 } from "lucide-react";
-import * as faceapi from "face-api.js";
 import { useInterview } from "@/hooks/useInterview";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useEvaluation } from "@/hooks/useEvaluation";
 import { useReport } from "@/hooks/useReport";
-import type { ComposureLogItem } from "@/hooks/useEmotionDetection";
+import { useEmotionDetection } from "@/hooks/useEmotionDetection";
+import { BehaviorAnalyticsOverlay } from "@/features/emotion";
 
 export default function InterviewSession() {
   const { id } = useParams() as { id: string };
@@ -40,24 +40,26 @@ export default function InterviewSession() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null,
-  );
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
-  // Camera & face-api states
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Integrated Camera & MediaPipe behavior analysis hook
   const [cameraActive, setCameraActive] = useState(true);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [modelsLoadedSuccessfully, setModelsLoadedSuccessfully] =
-    useState(false);
-  const [detectedEmotion, setDetectedEmotion] =
-    useState<string>("Initializing...");
-  const [emotionLog, setEmotionLog] = useState<ComposureLogItem[]>([]);
+  const {
+    videoRef,
+    detectedEmotion,
+    emotionLog,
+    resetLog,
+    modelsLoaded,
+    liveMetrics,
+    liveExpressions,
+    faceStatus,
+    startAnswerTracking,
+    stopAnswerTracking,
+    workerError,
+  } = useEmotionDetection(cameraActive);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   const questions = interviewData?.questions || [];
   const currentQuestion = questions[currentIdx];
@@ -73,7 +75,7 @@ export default function InterviewSession() {
       if (interviewData.questions && interviewData.answers) {
         const unansweredIdx = interviewData.questions.findIndex(
           (q: { id: string; questionText: string }) =>
-            !interviewData.answers.some((a: { questionId: string }) => a.questionId === q.id),
+            !interviewData.answers.some((a: { questionId: string }) => a.questionId === q.id)
         );
         if (unansweredIdx !== -1) {
           setCurrentIdx(unansweredIdx);
@@ -84,17 +86,21 @@ export default function InterviewSession() {
     }
   }, [interviewData, id, router]);
 
+  // Start tracking answer biometrics whenever currentQuestion changes
+  useEffect(() => {
+    if (currentQuestion) {
+      startAnswerTracking(currentQuestion.id);
+    }
+  }, [currentQuestion, startAnswerTracking]);
+
   // TTS Voice Synthesis for Questions
   const speakQuestion = useCallback(() => {
     if (!currentQuestion) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(
-      currentQuestion.questionText,
-    );
+    const utterance = new SpeechSynthesisUtterance(currentQuestion.questionText);
     utterance.rate = 0.95;
     const voices = window.speechSynthesis.getVoices();
-    const defaultVoice =
-      voices.find((v) => v.lang.startsWith("en")) || voices[0];
+    const defaultVoice = voices.find((v) => v.lang.startsWith("en")) || voices[0];
     if (defaultVoice) utterance.voice = defaultVoice;
     window.speechSynthesis.speak(utterance);
   }, [currentQuestion]);
@@ -105,139 +111,12 @@ export default function InterviewSession() {
     }
   }, [currentIdx, currentQuestion, speakQuestion]);
 
-  // Load face-api weights
-  useEffect(() => {
-    async function loadModels() {
-      try {
-        const MODEL_URL =
-          "https://justadudewhohacks.github.io/face-api.js/models";
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-        setModelsLoaded(true);
-        setModelsLoadedSuccessfully(true);
-        setDetectedEmotion("Neutral / Focused");
-      } catch (err) {
-        console.error("Failed to load face-api models:", err);
-        setModelsLoaded(true);
-        setModelsLoadedSuccessfully(false);
-        setDetectedEmotion("Focused");
-      }
-    }
-    loadModels();
-  }, []);
-
-  // Handle webcam streaming and expression detection
-  useEffect(() => {
-    let isMounted = true;
-    let detectInterval: NodeJS.Timeout | null = null;
-    let localStream: MediaStream | null = null;
-
-    async function startVideo() {
-      if (!cameraActive) {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
-        }
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 400, height: 300, facingMode: "user" },
-          audio: false,
-        });
-
-        if (!isMounted) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        localStream = stream;
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-
-        if (modelsLoaded && modelsLoadedSuccessfully) {
-          detectInterval = setInterval(async () => {
-            const video = videoRef.current;
-            if (
-              video &&
-              cameraActive &&
-              video.readyState >= 2 &&
-              video.videoWidth > 0 &&
-              video.videoHeight > 0
-            ) {
-              try {
-                const detections = await faceapi
-                  .detectSingleFace(
-                    video,
-                    new faceapi.TinyFaceDetectorOptions(),
-                  )
-                  .withFaceExpressions();
-
-                if (detections && isMounted) {
-                  const expressions = detections.expressions as unknown as Record<string, number>;
-                  let maxExpr = "neutral";
-                  let maxVal = 0;
-                  Object.keys(expressions).forEach((key) => {
-                    if (expressions[key] > maxVal) {
-                      maxVal = expressions[key];
-                      maxExpr = key;
-                    }
-                  });
-
-                  const capitalized =
-                    maxExpr.charAt(0).toUpperCase() + maxExpr.slice(1);
-                  setDetectedEmotion(capitalized);
-
-                  setEmotionLog((prev) => [
-                    ...prev,
-                    {
-                      timestamp: new Date().toISOString(),
-                      emotion: capitalized,
-                      confidence: maxVal,
-                    },
-                  ]);
-                }
-              } catch (err) {
-                console.debug("Face detection tick error:", err);
-              }
-            }
-          }, 1000);
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error("Camera access failed:", error);
-        }
-      }
-    }
-
-    if (modelsLoaded) {
-      startVideo();
-    }
-
-    return () => {
-      isMounted = false;
-      if (detectInterval) clearInterval(detectInterval);
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-    };
-  }, [modelsLoaded, cameraActive, modelsLoadedSuccessfully]);
-
   // Audio Recorder logic
   const startRecording = async () => {
     setAudioBlob(null);
     setAudioUrl(null);
     try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(audioStream);
       const chunks: BlobPart[] = [];
 
@@ -285,19 +164,20 @@ export default function InterviewSession() {
         transcriptText = "This is technical practice verbal input.";
       }
 
-      // 2. Evaluate answer using Llama 3.1 8B (combined technical & communication scores)
-      await evaluate(currentQuestion.id, transcriptText, emotionLog);
+      // Stop answer tracking & retrieve summarized analytics
+      const summaryAnalytics = stopAnswerTracking();
+      const analyticsData = summaryAnalytics || emotionLog;
+
+      // Evaluate answer using Llama 3.1 8B with summarized biometrics JSON
+      await evaluate(currentQuestion.id, transcriptText, analyticsData as any);
 
       // Check if this is the last question
-      const isLastQuestion =
-        currentIdx >= totalQuestions - 1 || currentIdx >= questions.length - 1;
+      const isLastQuestion = currentIdx >= totalQuestions - 1 || currentIdx >= questions.length - 1;
 
       if (isLastQuestion) {
-        // 3. Compile final report
         await generateReport(id);
         return { finished: true };
       } else {
-        // 4. Generate follow-up question
         await generateFollowUp(currentQuestion.questionText, transcriptText);
         return { finished: false };
       }
@@ -305,7 +185,7 @@ export default function InterviewSession() {
     onSuccess: (data: { finished: boolean }) => {
       setAudioBlob(null);
       setAudioUrl(null);
-      setEmotionLog([]);
+      resetLog();
 
       if (data?.finished) {
         router.push(`/report/${id}`);
@@ -391,10 +271,7 @@ export default function InterviewSession() {
               <ul className="text-xs text-neutral-400 space-y-2 list-disc list-inside font-medium leading-relaxed">
                 <li>Click the microphone icon below to start recording.</li>
                 <li>Ensure you talk clearly into your microphone device.</li>
-                <li>
-                  Once finished, click stop and review your voice response
-                  before submitting.
-                </li>
+                <li>Once finished, click stop and review your voice response before submitting.</li>
               </ul>
             </div>
           </div>
@@ -434,11 +311,7 @@ export default function InterviewSession() {
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                     Response audio ready
                   </span>
-                  <audio
-                    src={audioUrl || ""}
-                    controls
-                    className="mt-2 h-9 w-60 focus:outline-none"
-                  />
+                  <audio src={audioUrl || ""} controls className="mt-2 h-9 w-60 focus:outline-none" />
                 </div>
               ) : (
                 <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider">
@@ -459,7 +332,7 @@ export default function InterviewSession() {
                     {isTranscribing
                       ? "Transcribing Voice Response..."
                       : isEvaluating
-                        ? "Evaluating Answer & Composure..."
+                        ? "Evaluating Answer & Behavior..."
                         : isGeneratingReport
                           ? "Compiling Comprehensive Report..."
                           : "Analyzing and Evaluating..."}
@@ -487,10 +360,6 @@ export default function InterviewSession() {
                   muted
                   className="w-full h-full object-cover scale-x-[-1]"
                 />
-                <canvas
-                  ref={canvasRef}
-                  className="absolute inset-0 pointer-events-none"
-                />
               </>
             ) : (
               <div className="flex flex-col items-center gap-2 text-neutral-400">
@@ -505,54 +374,20 @@ export default function InterviewSession() {
               onClick={() => setCameraActive(!cameraActive)}
               className="absolute bottom-4 right-4 bg-white/90 backdrop-blur hover:bg-white text-neutral-800 rounded-full p-3 transition-all cursor-pointer border border-neutral-200 shadow-sm"
             >
-              {cameraActive ? (
-                <VideoOff className="w-4.5 h-4.5" />
-              ) : (
-                <Video className="w-4.5 h-4.5" />
-              )}
+              {cameraActive ? <VideoOff className="w-4.5 h-4.5" /> : <Video className="w-4.5 h-4.5" />}
             </button>
           </div>
 
-          <div className="bg-white border border-neutral-200/80 p-6 rounded-[28px] flex-1 flex flex-col justify-between shadow-sm">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs text-green-600 font-bold uppercase tracking-wider mb-2">
-                <Sparkles className="w-3.5 h-3.5" />
-                Emotion Telemetry
-              </div>
-              <h3 className="text-lg font-bold text-neutral-900">
-                Client-Side Biometrics
-              </h3>
-              <p className="text-neutral-500 text-xs mt-1.5 leading-relaxed font-medium">
-                Real-time analysis overlays your facial expressions to track
-                focus and calmness indicators during questions.
-              </p>
-
-              <div className="mt-6 p-4 rounded-full bg-[#F8FAF8] border border-neutral-200 flex justify-between items-center px-6">
-                <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider">
-                  Active Expression
-                </span>
-                <span className="text-sm font-extrabold text-green-600 text-glow">
-                  {detectedEmotion}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6 border-t border-neutral-100 pt-6">
-              <span className="text-xs text-neutral-500 font-extrabold uppercase tracking-wider">
-                FEEDBACK INDICATORS:
-              </span>
-              <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-neutral-400 font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  Focused Focus
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-300" />
-                  Calm Expression
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Behavior Analytics Overlay Panel */}
+          {liveMetrics && liveExpressions && (
+            <BehaviorAnalyticsOverlay
+              metrics={liveMetrics}
+              expressions={liveExpressions}
+              faceStatus={faceStatus}
+              isWorkerReady={modelsLoaded}
+              workerError={workerError}
+            />
+          )}
         </div>
       </div>
     </div>
